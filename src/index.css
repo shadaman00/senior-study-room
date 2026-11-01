@@ -1,0 +1,46 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* 1rem = 18px × 개인 글자 배율. 모든 크기를 rem 으로 써서 글자 크기 버튼이 화면 전체에 적용된다. */
+:root {
+  --font-scale: 1;
+  font-size: calc(18px * var(--font-scale));
+}
+
+body {
+  @apply bg-white text-ink font-sans antialiased;
+  line-height: 1.6;
+  word-break: keep-all;
+}
+
+/* 키보드 사용자도 위치를 잃지 않게 굵은 포커스 테두리 */
+:focus-visible {
+  outline: 4px solid #b35c00;
+  outline-offset: 3px;
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-2xl px-6 font-bold
+      min-h-touch min-w-touch text-2xl leading-tight select-none
+      transition-colors disabled:opacity-60 disabled:cursor-not-allowed;
+    padding-top: 0.6em;
+    padding-bottom: 0.6em;
+  }
+  .btn-primary {
+    @apply btn bg-brand text-white hover:bg-brand-dark active:bg-brand-dark;
+  }
+  .btn-outline {
+    @apply btn border-4 border-brand text-brand bg-white hover:bg-blue-50;
+  }
+  .card {
+    @apply rounded-3xl border-4 border-gray-800 bg-white p-5;
+  }
+  .field {
+    @apply w-full rounded-2xl border-4 border-gray-800 px-5 text-3xl font-bold tracking-widest
+      min-h-touch bg-white text-ink placeholder:text-gray-600;
+    padding-top: 0.4em;
+    padding-bottom: 0.4em;
+  }
+}
