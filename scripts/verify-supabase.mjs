@@ -141,6 +141,34 @@ try {
   })
   check('B 가 A 파일 경로로 교재 등록 → 차단', !!bRpcErr, bRpcErr?.message)
 
+  // 4-2. 공부 시간 기록 (study_sessions)
+  const now = new Date()
+  const sessionA = {
+    id: crypto.randomUUID(),
+    material_id: mat.id,
+    unit_number: 1,
+    started_at: new Date(now - 300000).toISOString(),
+    ended_at: now.toISOString(),
+    seconds: 300,
+  }
+  const { error: sesErr } = await A.client.from('study_sessions').upsert(sessionA, { onConflict: 'id' })
+  check('A 본인 공부 시간 기록', !sesErr, sesErr?.message)
+  await A.client.from('study_sessions').upsert({ ...sessionA, seconds: 420 }, { onConflict: 'id' })
+  const { data: sesA } = await A.client.from('study_sessions').select('seconds').eq('id', sessionA.id)
+  check('같은 기록 덮어쓰기(upsert) → 420초', sesA?.[0]?.seconds === 420)
+
+  const { data: bSes } = await B.client.from('study_sessions').select('*').eq('material_id', mat.id)
+  check('B 가 A 공부 시간 조회 → 빈 배열', Array.isArray(bSes) && bSes.length === 0)
+
+  const { error: bSesIns } = await B.client
+    .from('study_sessions')
+    .insert({ ...sessionA, id: crypto.randomUUID(), seconds: 9999 })
+  check('B 가 A 교재로 공부 시간 기록 → 차단', !!bSesIns, bSesIns?.message)
+
+  await B.client.from('study_sessions').upsert({ ...sessionA, seconds: 1 }, { onConflict: 'id' })
+  const { data: sesA2 } = await A.client.from('study_sessions').select('seconds').eq('id', sessionA.id)
+  check('B 가 A 공부 시간 덮어쓰기 → 반영 안 됨', sesA2?.[0]?.seconds === 420)
+
   const anon = createClient(url, anonKey, opts)
   const { data: anonMat } = await anon.from('materials').select('id')
   check('로그인 안 한 사용자 조회 → 빈 배열', Array.isArray(anonMat) && anonMat.length === 0)

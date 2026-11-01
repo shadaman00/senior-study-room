@@ -1,9 +1,9 @@
 import { Link } from 'react-router-dom'
-import { formatDay, unitLabel } from '../lib/format.js'
+import { formatDay, formatDuration, unitLabel } from '../lib/format.js'
 import Icon from './Icon.jsx'
 
 // 교재 하나의 단원별 진도판 : 단원 번호 칸(완료 = 초록), 다음 공부할 단원, 마지막 공부한 날
-export default function UnitBoard({ material }) {
+export default function UnitBoard({ material, studySeconds = 0 }) {
   const units = material.progress_items ?? []
   const next = units.find((u) => !u.is_completed)
   const last = units
@@ -66,7 +66,10 @@ export default function UnitBoard({ material }) {
         </p>
       )}
 
-      <p className="text-lg">{last ? `마지막으로 공부한 날: ${formatDay(last)}` : '아직 마친 단원이 없어요.'}</p>
+      <p className="text-lg">
+        {last ? `마지막으로 마친 날: ${formatDay(last)}` : '아직 마친 단원이 없어요.'}
+        <br />이 교재를 공부한 시간: <strong>{studySeconds >= 60 ? formatDuration(studySeconds) : '아직 없어요'}</strong>
+      </p>
 
       <Link to={`/study/${material.id}${next ? `?unit=${next.unit_number}` : ''}`} className="btn-primary w-full">
         {next ? `${next.unit_number}단원 공부하러 가기` : '다시 보러 가기'}

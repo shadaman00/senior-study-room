@@ -40,6 +40,21 @@ create table if not exists public.progress_items (
 alter table public.progress_items add column if not exists page_start int check (page_start >= 1);
 alter table public.progress_items add column if not exists page_end   int check (page_end >= page_start);
 
+-- 실제로 공부한 시간. 공부 화면을 열어 두고 화면이 켜져 있으며 5분 안에 손을 댄 동안만 센다.
+-- 한 번 들어온 공부 화면 × 단원마다 한 줄이며, 브라우저가 만든 id 로 30초마다 덮어쓴다(upsert).
+create table if not exists public.study_sessions (
+  id          uuid primary key,
+  user_id     uuid not null default auth.uid() references public.profiles (id) on delete cascade,
+  material_id uuid not null references public.materials (id) on delete cascade,
+  unit_number int,
+  started_at  timestamptz not null,
+  ended_at    timestamptz not null,
+  seconds     int not null check (seconds between 0 and 86400),
+  created_at  timestamptz not null default now(),
+  check (ended_at >= started_at)
+);
+
+create index if not exists study_sessions_user_idx on public.study_sessions (user_id, started_at desc);
 create index if not exists materials_user_idx      on public.materials (user_id, created_at desc);
 create index if not exists progress_material_idx   on public.progress_items (material_id, unit_number);
 
@@ -227,6 +242,24 @@ create policy "본인 진도 수정" on public.progress_items
   for update to authenticated using (user_id = auth.uid()) with check (user_id = auth.uid());
 create policy "본인 진도 삭제" on public.progress_items
   for delete to authenticated using (user_id = auth.uid());
+
+alter table public.study_sessions enable row level security;
+
+drop policy if exists "본인 공부 시간 조회" on public.study_sessions;
+drop policy if exists "본인 공부 시간 기록" on public.study_sessions;
+drop policy if exists "본인 공부 시간 갱신" on public.study_sessions;
+create policy "본인 공부 시간 조회" on public.study_sessions
+  for select to authenticated using (user_id = auth.uid());
+create policy "본인 공부 시간 기록" on public.study_sessions
+  for insert to authenticated with check (
+    user_id = auth.uid()
+    and exists (select 1 from public.materials m where m.id = material_id and m.user_id = auth.uid())
+  );
+create policy "본인 공부 시간 갱신" on public.study_sessions
+  for update to authenticated using (user_id = auth.uid()) with check (
+    user_id = auth.uid()
+    and exists (select 1 from public.materials m where m.id = material_id and m.user_id = auth.uid())
+  );
 
 -- 사용자가 completed_units 를 임의로 고치지 못하게 막는다 (sync 트리거만 갱신)
 -- Supabase 는 테이블 단위 UPDATE 권한을 주므로 컬럼 REVOKE 대신 트리거로 막는다.

@@ -35,7 +35,8 @@ function ZoomControls({ zoom, setZoom }) {
 
 // 앱 안에서 교재를 바로 보는 뷰어. +/− 큰 버튼으로 100% ~ 300% 확대 (PRD 3-1 ④)
 // openAt 이 바뀌면({ page, nonce }) 그 쪽을 전체 화면으로 연다 (단원 카드의 [크게 보기])
-export default function MaterialViewer({ url, fileType, title, openAt }) {
+// onPageChange(n) : 지금 보고 있는 쪽 (공부 시간을 단원별로 나눠 재는 데 쓴다)
+export default function MaterialViewer({ url, fileType, title, openAt, onPageChange }) {
   const [zoom, setZoom] = useState(MIN_ZOOM)
   const [full, setFull] = useState(null) // null | { page }
   const closeFull = useCallback(() => setFull(null), [])
@@ -52,7 +53,7 @@ export default function MaterialViewer({ url, fileType, title, openAt }) {
         {!url ? (
           <p className="p-6 text-xl">교재를 여는 중입니다…</p>
         ) : fileType === 'pdf' ? (
-          <PdfPages url={url} zoom={zoom} />
+          <PdfPages url={url} zoom={zoom} onPageChange={full ? undefined : onPageChange} />
         ) : (
           <img src={url} alt={title} style={{ width: `${zoom}%`, maxWidth: 'none' }} className="block" />
         )}
@@ -69,15 +70,33 @@ export default function MaterialViewer({ url, fileType, title, openAt }) {
       </button>
 
       {full && url && (
-        <FullScreenViewer url={url} fileType={fileType} title={title} startPage={full.page} onClose={closeFull} />
+        <FullScreenViewer
+          url={url}
+          fileType={fileType}
+          title={title}
+          startPage={full.page}
+          onClose={closeFull}
+          onPageChange={onPageChange}
+        />
       )}
     </section>
   )
 }
 
-function FullScreenViewer({ url, fileType, title, startPage, onClose }) {
+function FullScreenViewer({ url, fileType, title, startPage, onClose, onPageChange }) {
   const [zoom, setZoom] = useState(MIN_ZOOM)
-  const [page, setPage] = useState(startPage)
+  const [page, setPageState] = useState(startPage)
+  const setPage = useCallback(
+    (n) => {
+      setPageState(n)
+      onPageChange?.(n)
+    },
+    [onPageChange],
+  )
+
+  useEffect(() => {
+    onPageChange?.(startPage)
+  }, [startPage]) // eslint-disable-line react-hooks/exhaustive-deps
   const [numPages, setNumPages] = useState(0)
   const [goTo, setGoTo] = useState({ page: startPage, nonce: 0 })
   const closeRef = useRef(null)

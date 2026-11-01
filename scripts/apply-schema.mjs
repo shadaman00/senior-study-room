@@ -65,7 +65,7 @@ try {
   const { rows: tables } = await client.query(`
     select c.relname as name, c.relrowsecurity as rls
       from pg_class c join pg_namespace n on n.oid = c.relnamespace
-     where n.nspname = 'public' and c.relname in ('profiles', 'materials', 'progress_items')
+     where n.nspname = 'public' and c.relname in ('profiles', 'materials', 'progress_items', 'study_sessions')
      order by 1`)
   const { rows: policies } = await client.query(
     `select count(*)::int as n from pg_policies where schemaname in ('public', 'storage') and policyname like '본인%'`,
