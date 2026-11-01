@@ -36,6 +36,10 @@ create table if not exists public.progress_items (
   unique (material_id, unit_number)
 );
 
+-- 단원이 교재의 몇 쪽부터 몇 쪽까지인지 (교재 분석으로 제안 → 사용자가 확정). 사진 교재는 비어 있다.
+alter table public.progress_items add column if not exists page_start int check (page_start >= 1);
+alter table public.progress_items add column if not exists page_end   int check (page_end >= page_start);
+
 create index if not exists materials_user_idx      on public.materials (user_id, created_at desc);
 create index if not exists progress_material_idx   on public.progress_items (material_id, unit_number);
 
@@ -137,6 +141,45 @@ begin
   insert into public.progress_items (material_id, unit_number, unit_title)
   select m.id, n, n || '단원'
     from generate_series(1, p_total_units) as n;
+
+  return m;
+end;
+$$;
+
+-- 3-2. 사용자가 확정한 단원 목록으로 교재를 등록한다
+--      p_units = [{"title": "센서로 고장을 미리", "page_start": 4, "page_end": 14}, ...]
+create or replace function public.create_material_with_units(
+  p_title     text,
+  p_file_path text,
+  p_file_type text,
+  p_units     jsonb
+)
+returns public.materials
+language plpgsql
+security invoker set search_path = public
+as $$
+declare
+  m public.materials;
+  n int := jsonb_array_length(p_units);
+begin
+  if split_part(p_file_path, '/', 1) <> auth.uid()::text then
+    raise exception '본인 폴더의 파일만 등록할 수 있습니다';
+  end if;
+  if n < 1 or n > 200 then
+    raise exception '단원은 1개에서 200개까지 정할 수 있습니다';
+  end if;
+
+  insert into public.materials (title, file_path, file_type, total_units)
+  values (p_title, p_file_path, p_file_type, n)
+  returning * into m;
+
+  insert into public.progress_items (material_id, unit_number, unit_title, page_start, page_end)
+  select m.id,
+         u.ord::int,
+         coalesce(nullif(left(trim(u.value ->> 'title'), 100), ''), u.ord || '단원'),
+         (u.value ->> 'page_start')::int,
+         (u.value ->> 'page_end')::int
+    from jsonb_array_elements(p_units) with ordinality as u(value, ord);
 
   return m;
 end;

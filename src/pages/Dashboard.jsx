@@ -6,6 +6,8 @@ import ProgressBar, { statusOf } from '../components/ProgressBar.jsx'
 import Icon from '../components/Icon.jsx'
 import TopBar from '../components/TopBar.jsx'
 import UploadModal from '../components/UploadModal.jsx'
+import UnitBoard from '../components/UnitBoard.jsx'
+import { formatDay, unitLabel } from '../lib/format.js'
 
 export default function Dashboard() {
   const { profile } = useAuth()
@@ -16,8 +18,11 @@ export default function Dashboard() {
   const load = useCallback(async () => {
     const { data, error: err } = await supabase
       .from('materials')
-      .select('id, title, file_type, total_units, completed_units, created_at')
+      .select(
+        'id, title, file_type, total_units, completed_units, created_at, progress_items(unit_number, unit_title, is_completed, completed_at, page_start, page_end)',
+      )
       .order('created_at', { ascending: false })
+      .order('unit_number', { referencedTable: 'progress_items' })
     if (err) setError('교재 목록을 불러오지 못했습니다. 인터넷 연결을 확인해 주세요.')
     else setMaterials(data)
   }, [])
@@ -28,6 +33,10 @@ export default function Dashboard() {
 
   const totalUnits = materials?.reduce((s, m) => s + m.total_units, 0) ?? 0
   const doneUnits = materials?.reduce((s, m) => s + m.completed_units, 0) ?? 0
+  const recent = (materials ?? [])
+    .flatMap((m) => m.progress_items.filter((u) => u.completed_at).map((u) => ({ ...u, material: m })))
+    .sort((a, b) => (a.completed_at < b.completed_at ? 1 : -1))
+    .slice(0, 5)
 
   return (
     <div className="min-h-screen pb-40">
@@ -88,16 +97,31 @@ export default function Dashboard() {
                   total={m.total_units}
                   size="md"
                   label={`${m.title} 진도`}
-                  showRemaining
                 />
-                <Link to={`/study/${m.id}`} className="btn-primary w-full">
-                  공부하러 가기
-                  <Icon name="arrowRight" />
-                </Link>
+                <UnitBoard material={m} />
               </article>
             )
           })}
         </section>
+
+        {recent.length > 0 && (
+          <section aria-labelledby="recent-title" className="card flex flex-col gap-3">
+            <h2 id="recent-title" className="text-3xl font-black">
+              최근 공부 기록
+            </h2>
+            <ul className="flex flex-col divide-y-2 divide-gray-300">
+              {recent.map((u) => (
+                <li key={`${u.material.id}-${u.unit_number}`} className="py-3">
+                  <p className="text-lg font-bold text-done-text">✓ {formatDay(u.completed_at)}</p>
+                  <p className="text-xl font-bold">
+                    {u.unit_number}단원{unitLabel(u) && ` · ${unitLabel(u)}`}
+                  </p>
+                  <p className="text-lg">{u.material.title}</p>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
       </main>
 
       <div className="fixed inset-x-0 bottom-0 border-t-4 border-gray-800 bg-white p-4">
